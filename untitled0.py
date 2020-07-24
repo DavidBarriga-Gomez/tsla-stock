@@ -8,9 +8,13 @@ Created on Mon Jul 20 18:37:12 2020
 from keras.layers.core import Dense, Activation, Dropout
 from keras.layers.recurrent import LSTM
 from keras.models import Sequential
-import lstm, time
 
-X_train, y_train, X_test, y_test = lstm.load_data('TSLA.csv', 50, True)
+import lstm, time, get_data
+from keras.utils.vis_utils import plot_model 
+
+
+X_train, y_train, X_test, y_test = get_data.get_yahoo_finance_data('TSLA', 50, True)
+
 model = Sequential()
 model.add(LSTM(input_dim =1,
                output_dim=50,
@@ -32,3 +36,5 @@ model.fit(X_train, y_train, batch_size=512, nb_epoch=1, validation_split=0.05)
 
 predictions = lstm.predict_sequences_multiple(model, X_test, 50, 50)
 lstm.plot_results_multiple(predictions, y_test, 50)
+
+plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
