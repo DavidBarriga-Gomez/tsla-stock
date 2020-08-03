@@ -8,6 +8,7 @@ Created on Tue Jul 28 20:43:27 2020
 import yfinance as yf
 import numpy as np
 from datetime import date
+from sklearn.preprocessing import MinMaxScaler
 
 def normalise_windows(window_data):
    normalised_data = []
@@ -27,21 +28,20 @@ def get_yahoo_finance_data(ticker, seq_len, normalise_window):
     sequence_length = seq_len + 1
     
     data = numpyData
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    data = scaler.fit_transform(data)
     result = []
     for index in range(len(data) - sequence_length):
         result.append(data[index: index + sequence_length])
     # if normalise_window:
     #     result = np.sin(result)
         # result = normalise_windows(result)
-        
     result = np.array(result)
     row = round(0.9 * result.shape[0])
     train = result[:int(row), :]
     np.random.shuffle(train)
-    y_traincolumn = train[:,0,3] #Get closing column as its own array
-    ytrain = y_traincolumn[:int(row)]
     x_train = train[:, :-1]
-    y_train = ytrain[:]
+    y_train = train[:, :-1]
     x_test = result[int(row):, :-1]
     y_test = result[int(row):, -1]
     
