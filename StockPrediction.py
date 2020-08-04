@@ -1,4 +1,4 @@
-import GetData
+from YahooFinanceDataClient import YahooFinanceDataClient
 from tensorflow import keras
 from tensorflow.keras import layers
 from matplotlib import pyplot
@@ -7,7 +7,8 @@ from sklearn.metrics import mean_squared_error
 from math import sqrt
 
 seq_history_len = 40
-x_train, y_train, x_test, y_test, scaler_fitted, n_features = GetData.get_yahoo_finance_data('TSLA', seq_history_len, 5)
+yahooClient = YahooFinanceDataClient()
+x_train, y_train, x_test, y_test, scaler_fitted, n_features = yahooClient.get_yahoo_finance_data('TSLA', seq_history_len, 5)
 inputs = keras.Input(shape=(seq_history_len, x_train.shape[2]))
 layer_dropout_out = layers.Dropout(.2)
 layer_1_output = layers.LSTM(50, input_shape=(x_train.shape[1], x_train.shape[2]))(inputs)
