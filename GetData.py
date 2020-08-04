@@ -1,5 +1,4 @@
 import yfinance as yf
-import numpy as np
 from datetime import date
 from sklearn.preprocessing import MinMaxScaler
 from pandas import DataFrame
@@ -51,4 +50,4 @@ def get_yahoo_finance_data(ticker, seq_history_len, seq_prediction_len):
     x_train = x_train.reshape((x_train.shape[0], seq_history_len, n_features))
     x_test = x_test.reshape((x_test.shape[0], seq_history_len, n_features))
    
-    return [x_train, y_train, x_test, y_test, scaler, seq_history_len, n_features]
+    return [x_train, y_train, x_test, y_test, scaler, n_features]
