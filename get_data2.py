@@ -1,51 +1,54 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Jul 28 20:43:27 2020
-
-@author: ninja
-"""
-
 import yfinance as yf
 import numpy as np
 from datetime import date
 from sklearn.preprocessing import MinMaxScaler
+from pandas import DataFrame
+from pandas import concat
 
-def normalise_windows(window_data):
-   normalised_data = []
-   for column in range(len(window_data)-1):
-       for window in window_data[column]:
-           normalised_window = [((float(p) / float(window[0])) - 1) for p in window]
-           normalised_data.append(normalised_window)
-   return normalised_data
+def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
+	n_vars = 1 if type(data) is list else data.shape[1]
+	df = DataFrame(data)
+	cols, names = list(), list()
+	# input sequence (t-n, ... t-1)
+	for i in range(n_in, 0, -1):
+		cols.append(df.shift(i))
+		names += [('var%d(t-%d)' % (j+1, i)) for j in range(n_vars)]
+	# forecast sequence (t, t+1, ... t+n)
+	for i in range(0, n_out):
+		cols.append(df.shift(-i))
+		if i == 0:
+			names += [('var%d(t)' % (j+1)) for j in range(n_vars)]
+		else:
+			names += [('var%d(t+%d)' % (j+1, i)) for j in range(n_vars)]
+	# put it all together
+	agg = concat(cols, axis=1)
+	agg.columns = names
+	# drop rows with NaN values
+	if dropnan:
+		agg.dropna(inplace=True)
+	return agg
 
-def get_yahoo_finance_data(ticker, seq_len, normalise_window):
+def get_yahoo_finance_data(ticker, seq_history_len, seq_prediction_len):
     start = '2010-01-01'
     end = date.today()
     yfResult = yf.download(ticker, start=start, end=end, progress=False, interval='1d')
-
-    numpyData = yfResult.to_numpy()
     
-    sequence_length = seq_len + 1
-    
-    data = numpyData
     scaler = MinMaxScaler(feature_range=(0, 1))
-    data = scaler.fit_transform(data)
-    result = []
-    for index in range(len(data) - sequence_length):
-        result.append(data[index: index + sequence_length])
-    # if normalise_window:
-    #     result = np.sin(result)
-        # result = normalise_windows(result)
-    result = np.array(result)
-    row = round(0.9 * result.shape[0])
-    train = result[:int(row), :]
-    np.random.shuffle(train)
-    x_train = train[:, :-1]
-    y_train = train[:, :-1]
-    x_test = result[int(row):, :-1]
-    y_test = result[int(row):, -1]
+    scaled = scaler.fit_transform(yfResult)
+    reframed = series_to_supervised(scaled, seq_history_len, seq_prediction_len, True)
+   
+    values = reframed.values    
     
-    # x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
-    # x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))  
-
-    return [x_train, y_train, x_test, y_test]
+    n_train_years = 5
+    n_train_days = 365 * n_train_years    
+    train = values[:n_train_days, :]
+    test = values[n_train_days:, :]
+    
+    n_features = 5 #columns in input data set
+    n_obs = seq_history_len * n_features
+    x_train, y_train = train[:, :n_obs], train[:, -n_features]
+    x_test, y_test = test[:, :n_obs], test[:, -n_features]
+    x_train = x_train.reshape((x_train.shape[0], seq_history_len, n_features))
+    x_test = x_test.reshape((x_test.shape[0], seq_history_len, n_features))
+   
+    return [x_train, y_train, x_test, y_test, scaler, seq_history_len, n_features]
