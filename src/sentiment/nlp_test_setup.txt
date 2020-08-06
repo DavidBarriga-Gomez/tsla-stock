@@ -1,0 +1,9 @@
+before you can run nlp_test.py you need to add some localdata.
+go in terminal and start an interactive python session by typing python (press enter)
+then type import nltk (press enter)
+then type nltk.download('twitter_samples') (press enter)
+then type nltk.download('punkt') (press enter)
+then type nltk.download('stopwords') (press enter)
+then type nltk.download('wordnet') (press enter)
+then type nltk.download('averaged_perceptron_tagger') (press enter)
+then type exit() (press enter)
