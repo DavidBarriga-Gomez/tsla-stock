@@ -5,8 +5,10 @@ from pandas import concat
 
 r = requests.get('https://financialmodelingprep.com/api/v3/historical-rating/AAPL?apikey=cf8050149d7fc94c4a855a1409640b36')
 #convert to panda df (adding colums name)   
-#dF = pd.DataFrame.from_records(r.json())
-dF = r.json()
+dF = pd.DataFrame.from_records(r.json())
+dF_dropped= dF.drop(['ratingDetailsDERecommendation','symbol','rating','ratingDetailsPERecommendation','ratingDetailsPBRecommendation','ratingRecommendation','ratingDetailsDCFRecommendation','ratingDetailsROERecommendation','ratingDetailsROARecommendation',],1)
+print(dF_dropped)
+
 
  
 def series_to_supervised(dF, n_in=1, n_out=1, dropnan=True):
@@ -32,6 +34,6 @@ def series_to_supervised(dF, n_in=1, n_out=1, dropnan=True):
 		agg.dropna(inplace=True)
 	return agg
 #values = [x for x in range(10)]
-big_data = series_to_supervised(pd.DataFrame.from_records(dF), 5)
+big_data = series_to_supervised(pd.DataFrame.from_records(dF_dropped), 5)
 print(big_data)
 
