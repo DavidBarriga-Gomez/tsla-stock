@@ -37,3 +37,5 @@ def series_to_supervised(dF, n_in=1, n_out=1, dropnan=True):
 big_data = series_to_supervised(pd.DataFrame.from_records(dF_dropped), 5)
 print(big_data)
 
+
+
