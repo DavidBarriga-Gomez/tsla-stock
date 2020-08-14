@@ -36,14 +36,13 @@ LOSS = "huber_loss"
 OPTIMIZER = "adam"
 BATCH_SIZE = 64
 EPOCHS = 75
-
-ticker = "SPY"
+TICKER = "SPY"
 
 np.random.seed(314)
 tf.random.set_seed(314) #this seeds the weights so that the model is the same every run
 
 yahooClient = YahooFinanceDataClient()
-processedDataModel = yahooClient.get_data_lstm_processed('SPY', N_STEPS, LOOKUP_STEP, TRAIN_SIZE)
+processedDataModel = yahooClient.get_data_lstm_processed(TICKER, N_STEPS, LOOKUP_STEP, TRAIN_SIZE)
 shape = (processedDataModel.x_train.shape[1], N_STEPS)
 inputs = keras.Input(shape=shape)
 output_layer = LSTMModelGenerator().create_lstm_layers(inputs=inputs, units=256, cell=layers.LSTM, n_layers=2, dropout=.3, bidirectional=BIDIRECTIONAL)
@@ -52,9 +51,9 @@ model = keras.Model(inputs=inputs, outputs=output_layer, name="mnist_model")
 
 model.compile(optimizer='adam', metrics=["mean_absolute_error"], loss=LOSS)
 
-ticker_data_filename = os.path.join("data", f"{ticker}_{date_now}.csv")
+ticker_data_filename = os.path.join("data", f"{TICKER}_{date_now}.csv")
 # model name to save, making it as unique as possible based on parameters
-model_name = f"{date_now}_{ticker}-{LOSS}-{OPTIMIZER}-{CELL.__name__}-seq-{N_STEPS}-step-{LOOKUP_STEP}-layers-{N_LAYERS}-units-{UNITS}"
+model_name = f"{date_now}_{TICKER}-{LOSS}-{OPTIMIZER}-{CELL.__name__}-seq-{N_STEPS}-step-{LOOKUP_STEP}-layers-{N_LAYERS}-units-{UNITS}"
 if BIDIRECTIONAL:
     model_name += "-b"
     
