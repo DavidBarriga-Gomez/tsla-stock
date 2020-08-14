@@ -1,54 +1,68 @@
 import yfinance as yf
-from datetime import date
 from sklearn.preprocessing import MinMaxScaler
 from pandas import DataFrame
-from pandas import concat
+from LSTMProcessedData import LSTMProcessedData
+import numpy
+from collections import deque
+from sklearn.model_selection import train_test_split
 
 class YahooFinanceDataClient:
-    def series_to_supervised(self, data, n_in=1, n_out=1, dropnan=True):
-    	n_vars = 1 if type(data) is list else data.shape[1]
-    	df = DataFrame(data)
-    	cols, names = list(), list()
-    	# input sequence (t-n, ... t-1)
-    	for i in range(n_in, 0, -1):
-    		cols.append(df.shift(i))
-    		names += [('var%d(t-%d)' % (j+1, i)) for j in range(n_vars)]
-    	# forecast sequence (t, t+1, ... t+n)
-    	for i in range(0, n_out):
-    		cols.append(df.shift(-i))
-    		if i == 0:
-    			names += [('var%d(t)' % (j+1)) for j in range(n_vars)]
-    		else:
-    			names += [('var%d(t+%d)' % (j+1, i)) for j in range(n_vars)]
-    	# put it all together
-    	agg = concat(cols, axis=1)
-    	agg.columns = names
-    	# drop rows with NaN values
-    	if dropnan:
-    		agg.dropna(inplace=True)
-    	return agg
-    
-    def get_yahoo_finance_data(self, ticker, seq_history_len, seq_prediction_len):
-        start = '2010-01-01'
-        end = date.today()
-        yfResult = yf.download(ticker, start=start, end=end, progress=False, interval='1d')
-        
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        scaled = scaler.fit_transform(yfResult)
-        reframed = self.series_to_supervised(scaled, seq_history_len, seq_prediction_len, True)
+
+    def get_data_lstm_processed(self, ticker, seq_history_len, seq_prediction_len, n_train_percentage):
+        yfDataFrame = yf.Ticker(ticker).history(period="max", interval="1d")
+        dateColumn = yfDataFrame.index
+        yfDataFrame.insert(0,"Day", dateColumn.day)
+        yfDataFrame.insert(0,"Month", dateColumn.month)
+        yfDataFrame.columns = yfDataFrame.columns.str.replace(' ', '')
+        yfDataFrame = yfDataFrame.drop(["Dividends", "StockSplits"], 1)
+        n_features = len(yfDataFrame.columns)
+
+        column_scaler = {}
+        preprocessed_data = yfDataFrame.copy()
+        # scale the data (prices) from 0 to 1
+        for column in yfDataFrame.columns:
+            scaler = MinMaxScaler()
+            column_data = yfDataFrame[column]
+            # column_data = yfDataFrame[column].to_numpy().reshape(-1, 1)
+            # expanded_data = numpy.expand_dims(column_data, axis=1)
+            a =scaler.fit_transform(numpy.expand_dims(column_data, axis=1))
+            preprocessed_data[column] = a
+            column_scaler[column] = scaler
        
-        values = reframed.values    
+        # add the target column (label) by shifting by `lookup_step`
+        preprocessed_data['future'] = preprocessed_data['Close'].shift(-seq_prediction_len)
+        # last `lookup_step` columns contains NaN in future column
+        # get them before droping NaNs
+        last_sequence = numpy.array(preprocessed_data[yfDataFrame.columns].tail(seq_prediction_len))
+        # drop NaNs
+        preprocessed_data.dropna(inplace=True)
         
-        n_train_years = 5
-        n_train_days = 365 * n_train_years    
-        train = values[:n_train_days, :]
-        test = values[n_train_days:, :]
+        sequence_data = []
+        sequences = deque(maxlen=seq_history_len)
+        for entry, target in zip(preprocessed_data[yfDataFrame.columns].values, preprocessed_data['future'].values):
+            sequences.append(entry)
+            if len(sequences) == seq_history_len:
+                sequence_data.append([numpy.array(sequences), target])
         
-        n_features = 5 #columns in input data set
-        n_obs = seq_history_len * n_features
-        x_train, y_train = train[:, :n_obs], train[:, -n_features]
-        x_test, y_test = test[:, :n_obs], test[:, -n_features]
-        x_train = x_train.reshape((x_train.shape[0], seq_history_len, n_features))
-        x_test = x_test.reshape((x_test.shape[0], seq_history_len, n_features))
-       
-        return [x_train, y_train, x_test, y_test, scaler, n_features]
+        # get the last sequence by appending the last `n_step` sequence with `lookup_step` sequence
+        # for instance, if n_steps=50 and lookup_step=10, last_sequence should be of 59 (that is 50+10-1) length
+        # this last_sequence will be used to predict in future dates that are not available in the dataset
+        last_sequence = list(sequences) + list(last_sequence)
+        
+         # shift the last sequence by -1
+        last_sequence = numpy.array(DataFrame(last_sequence).shift(-1).dropna())
+        # add to result
+        # construct the X's and y's
+        X, y = [], []
+        for seq, target in sequence_data:
+            X.append(seq)
+            y.append(target)
+        # convert to numpy arrays
+        X = numpy.array(X)
+        y = numpy.array(y)
+        # reshape X to fit the neural network
+        X = X.reshape((X.shape[0], X.shape[2], X.shape[1]))
+        # split the dataset
+        x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=1-n_train_percentage, shuffle=True)
+        dataModel = LSTMProcessedData(yfDataFrame, x_train, y_train, x_test, y_test, n_features, column_scaler, last_sequence)
+        return dataModel
